@@ -1,7 +1,7 @@
 #-----------------------------------------#
 # Using image from circleci
 #-----------------------------------------#
-FROM circleci/python
+FROM cimg/go:1.19
 
 ### Install dependent packages
 RUN sudo pip install ecs-deploy && \
