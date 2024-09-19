@@ -1,7 +1,7 @@
 #-----------------------------------------#
 # Using image from circleci
 #-----------------------------------------#
-FROM cimg/go:1.21
+FROM cimg/go:1.22
 
 ### Install dependent packages
 RUN sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
