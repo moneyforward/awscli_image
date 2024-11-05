@@ -7,24 +7,38 @@ RDS_PORT=3306  # Change this to your RDS port, e.g., 5432 for PostgreSQL or 3306
 # REDIS_ENDPOINT="your-redis-endpoint.cache.amazonaws.com"
 REDIS_PORT=6379  # Default Redis port
 
+# Function to print a separator
+print_separator() {
+    echo "========================================"
+}
+
+# Function to print a timestamp
+print_timestamp() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S')"
+}
+
 # Function to check RDS network connectivity
 check_rds_connection() {
-    echo "Checking RDS network connectivity..."
+    print_separator
+    echo "$(print_timestamp) - Checking RDS network connectivity..."
     if nc -zv "$RDS_ENDPOINT" "$RDS_PORT" 2>/dev/null; then
-        echo "Successfully connected to RDS at $RDS_ENDPOINT on port $RDS_PORT."
+        echo "$(print_timestamp) - Successfully connected to RDS at $RDS_ENDPOINT on port $RDS_PORT."
     else
-        echo "Failed to connect to RDS at $RDS_ENDPOINT on port $RDS_PORT."
+        echo "$(print_timestamp) - Failed to connect to RDS at $RDS_ENDPOINT on port $RDS_PORT."
     fi
+    print_separator
 }
 
 # Function to check Redis network connectivity
 check_redis_connection() {
-    echo "Checking Redis network connectivity..."
+    print_separator
+    echo "$(print_timestamp) - Checking Redis network connectivity..."
     if nc -zv "$REDIS_ENDPOINT" "$REDIS_PORT" 2>/dev/null; then
-        echo "Successfully connected to Redis at $REDIS_ENDPOINT on port $REDIS_PORT."
+        echo "$(print_timestamp) - Successfully connected to Redis at $REDIS_ENDPOINT on port $REDIS_PORT."
     else
-        echo "Failed to connect to Redis at $REDIS_ENDPOINT on port $REDIS_PORT."
+        echo "$(print_timestamp) - Failed to connect to Redis at $REDIS_ENDPOINT on port $REDIS_PORT."
     fi
+    print_separator
 }
 
 # Run the checks
