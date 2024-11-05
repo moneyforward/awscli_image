@@ -1,16 +1,13 @@
-#-----------------------------------------#
-# Using image from circleci
-#-----------------------------------------#
-FROM circleci/python
+# Use the Amazon Linux-based AWS CLI image
+FROM amazonlinux:latest
 
-### Install dependent packages
-RUN sudo pip install ecs-deploy && \
-    sudo apt-get install -y jq gettext
+# Install the AWS CLI
+RUN yum update -y && \
+    yum install -y aws-cli
 
-RUN sudo curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+# Install netcat using yum
+RUN yum install -y nc
 
-RUN sudo unzip awscliv2.zip
+COPY ./check-connections.sh /usr/local/bin/check-connections.sh
 
-RUN sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin
-
-RUN sudo aws --version
+RUN chmod +x /usr/local/bin/check-connections.sh
