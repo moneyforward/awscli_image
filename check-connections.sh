@@ -72,7 +72,47 @@ check_s3_permissions() {
     print_separator
 }
 
+list_key_value() {
+    print_separator
+
+    # Environment variables from the pod containing key=value pairs
+    env_vars=$(printenv)
+
+    # Default ports
+    DEFAULT_TCP_PORT=80
+    DEFAULT_HTTP_PORT=80
+    DEFAULT_HTTPS_PORT=443
+
+    # Process the values
+    while IFS='=' read -r key value; do
+        # Check if the value is a URL with a protocol
+        if [[ "$value" =~ ^(tcp|http|https)://([^:/]+)(:([0-9]+))?$ ]]; then
+            protocol=${BASH_REMATCH[1]}
+            host=${BASH_REMATCH[2]}
+            port=${BASH_REMATCH[3]}
+
+            # Assign the default port if no port is specified
+            case "$protocol" in
+                tcp)
+                    port=${port:-$DEFAULT_TCP_PORT}
+                    ;;
+                http)
+                    port=${port:-$DEFAULT_HTTP_PORT}
+                    ;;
+                https)
+                    port=${port:-$DEFAULT_HTTPS_PORT}
+                    ;;
+            esac
+
+            # Print the key=value with the determined port
+            echo "$key=$protocol://$host:$port"
+        fi
+    done <<< "$env_vars"
+    print_separator
+}
+
 # Run the checks
+list_key_value
 check_s3_permissions
 check_rds_connection
 check_redis_connection
