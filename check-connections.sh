@@ -75,44 +75,48 @@ check_s3_permissions() {
 list_key_value() {
     print_separator
 
-    # Environment variables from the pod containing key=value pairs
-    env_vars=$(printenv)
+    port_custom=$1
 
-    # Default ports
-    DEFAULT_TCP_PORT=80
-    DEFAULT_HTTP_PORT=80
-    DEFAULT_HTTPS_PORT=443
-
-    # Process the values
-    while IFS='=' read -r key value; do
-        # Check if the value is a URL with a protocol
-        if [[ "$value" =~ ^(tcp|http|https)://([^:/]+)(:([0-9]+))?$ ]]; then
-            protocol=${BASH_REMATCH[1]}
-            host=${BASH_REMATCH[2]}
-            port=${BASH_REMATCH[3]}
-
-            # Assign the default port if no port is specified
-            case "$protocol" in
-                tcp)
-                    port=${port:-$DEFAULT_TCP_PORT}
-                    ;;
-                http)
-                    port=${port:-$DEFAULT_HTTP_PORT}
-                    ;;
-                https)
-                    port=${port:-$DEFAULT_HTTPS_PORT}
-                    ;;
-            esac
-
-            # Print the key=value with the determined port
-            echo "$key=$protocol://$host:$port"
+    for url in $(printenv); do
+    
+        if [[ $url =~ ^([^=]+)=(.*) ]]; then
+            key=${BASH_REMATCH[1]}  
+            value=${BASH_REMATCH[2]} 
         fi
-    done <<< "$env_vars"
+
+        if [[ $value =~ ^https://([^:/]+)(:([0-9]+))?$ ]]; then  
+            host=${BASH_REMATCH[1]}
+            port=${BASH_REMATCH[3]:-443}
+            protocol="https"
+        elif [[ $value =~ ^http://([^:/]+)(:([0-9]+))?$ ]]; then
+            host=${BASH_REMATCH[1]}
+            port=${BASH_REMATCH[3]:-80}
+            protocol="http"
+        elif [[ $value =~ ^tcp://([^:/]+)(:([0-9]+))?$ ]]; then
+            host=${BASH_REMATCH[1]}
+            port=${BASH_REMATCH[3]:-80}
+            protocol="tcp"
+        elif [[ $value =~ ([0-9]{1,3}\.){3}[0-9]{1,3}(:([0-9]+))?$ ]]; then
+            host=${BASH_REMATCH[0]%%:*}
+            port=${BASH_REMATCH[3]:-${port_custom:-0}}
+            protocol=""
+        elif [[ $value =~ ^([a-zA-Z0-9.-]+):([0-9]+)$  ]]; then
+            host=${BASH_REMATCH[1]}
+            port=${BASH_REMATCH[2]:-${port_custom:-0}}
+            protocol=""
+        else
+            continue
+        fi
+        
+        [[ -z $protocol ]] && echo "${key}=${host}:${port}"  || echo "${key}=${protocol}://${host}:${port}" 
+    
+
+    done
     print_separator
 }
 
 # Run the checks
 list_key_value
-check_s3_permissions
-check_rds_connection
-check_redis_connection
+# check_s3_permissions
+# check_rds_connection
+# check_redis_connection
