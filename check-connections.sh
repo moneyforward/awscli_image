@@ -73,45 +73,75 @@ check_s3_permissions() {
 }
 
 list_key_value() {
-    print_separator
 
+    print_separator
+    
     port_custom=$1
+    declare -A seen_values  # Associative array to store already processed values
 
     for url in $(printenv); do
-    
+        # Check for key-value pairs from environment variables
         if [[ $url =~ ^([^=]+)=(.*) ]]; then
             key=${BASH_REMATCH[1]}  
             value=${BASH_REMATCH[2]} 
-        fi
-
-        if [[ $value =~ ^https://([^:/]+)(:([0-9]+))?$ ]]; then  
-            host=${BASH_REMATCH[1]}
-            port=${BASH_REMATCH[3]:-443}
-            protocol="https"
-        elif [[ $value =~ ^http://([^:/]+)(:([0-9]+))?$ ]]; then
-            host=${BASH_REMATCH[1]}
-            port=${BASH_REMATCH[3]:-80}
-            protocol="http"
-        elif [[ $value =~ ^tcp://([^:/]+)(:([0-9]+))?$ ]]; then
-            host=${BASH_REMATCH[1]}
-            port=${BASH_REMATCH[3]:-80}
-            protocol="tcp"
-        elif [[ $value =~ ([0-9]{1,3}\.){3}[0-9]{1,3}(:([0-9]+))?$ ]]; then
-            host=${BASH_REMATCH[0]%%:*}
-            port=${BASH_REMATCH[3]:-${port_custom:-0}}
-            protocol=""
-        elif [[ $value =~ ^([a-zA-Z0-9.-]+):([0-9]+)$  ]]; then
-            host=${BASH_REMATCH[1]}
-            port=${BASH_REMATCH[2]:-${port_custom:-0}}
-            protocol=""
         else
             continue
         fi
-        
-        [[ -z $protocol ]] && echo "${key}=${host}:${port}"  || echo "${key}=${protocol}://${host}:${port}" 
-    
 
+        # Case: URL contains amazonaws.com
+        if [[ $value =~ amazonaws\.com ]] && [[ ! $value =~ [^/]+/amazonaws\.com ]] && [[ ! $value =~ amazonaws\.com/[^/]+ ]]; then
+            
+            # If the value contains @, only take the part after @
+            if [[ $value =~ @ ]]; then
+                # Ensure the string after @ contains amazonaws.com
+                tmp_value=${value##*@}
+                if [[ $tmp_value =~ amazonaws\.com ]]; then
+                    value=$tmp_value
+                else
+                    continue  # Skip if the part after @ is invalid
+                fi
+            fi
+
+            # Skip if the value is too long
+            if [[ ${#value} -gt 1000 ]]; then
+                continue
+            fi
+
+            # Handle adding default ports for specific domains
+            if [[ $value =~ rds\.amazonaws\.com$ ]] && [[ ! $value =~ :[0-9]+$ ]]; then
+                value="${value}:3306"
+            elif [[ $value =~ cache\.amazonaws\.com$ ]] && [[ ! $value =~ :[0-9]+$ ]]; then
+                value="${value}:6379"
+            fi
+
+            # Skip if the value has already been processed
+            if [[ -n "${seen_values[$value]}" ]]; then
+                continue
+            fi
+
+            # Mark as processed and output the value
+            seen_values[$value]=1
+            echo "$value"
+            continue
+        fi
+
+        # Handle URLs that do not contain amazonaws.com
+        if [[ $value =~ ^https?://([^:/]+)(:([0-9]+))?(/.*)?$ ]]; then
+            host=${BASH_REMATCH[1]}
+            if [[ ${value} =~ ^https:// ]]; then
+                port=${BASH_REMATCH[3]:-443}  
+            elif [[ ${value} =~ ^http:// ]]; then
+                port=${BASH_REMATCH[3]:-80}   
+            fi 
+            echo "${host}:${port}"
+
+        elif [[ $value =~ ^([a-zA-Z0-9.-]+):([0-9]+)$ ]]; then
+            host=${BASH_REMATCH[1]}
+            port=${BASH_REMATCH[2]:-${port_custom:-0}}
+            echo "${host}:${port}"
+        fi
     done
+    
     print_separator
 }
 
