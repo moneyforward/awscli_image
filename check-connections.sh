@@ -141,12 +141,12 @@ list_key_value() {
             echo "${host}:${port}"
         fi
     done
-    
+
     print_separator
 }
 
 # Run the checks
 list_key_value
-# check_s3_permissions
-# check_rds_connection
-# check_redis_connection
+check_s3_permissions
+check_rds_connection
+check_redis_connection
