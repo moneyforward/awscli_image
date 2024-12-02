@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# Define your RDS and Redis endpoint details
-# RDS_ENDPOINT="your-rds-endpoint.rds.amazonaws.com"
-RDS_PORT=3306  # Change this to your RDS port, e.g., 5432 for PostgreSQL or 3306 for MySQL
-
-# REDIS_ENDPOINT="your-redis-endpoint.cache.amazonaws.com"
-REDIS_PORT=6379  # Default Redis port
-
 # Function to print a separator
 print_separator() {
     echo "========================================"
@@ -15,30 +8,6 @@ print_separator() {
 # Function to print a timestamp
 print_timestamp() {
     echo "$(date '+%Y-%m-%d %H:%M:%S')"
-}
-
-# Function to check RDS network connectivity
-check_rds_connection() {
-    print_separator
-    echo "$(print_timestamp) - Checking RDS network connectivity..."
-    if nc -zv "$RDS_ENDPOINT" "$RDS_PORT" >/dev/null 2>&1; then
-        echo "$(print_timestamp) - Successfully connected to RDS at $RDS_ENDPOINT on port $RDS_PORT."
-    else
-        echo "$(print_timestamp) - Failed to connect to RDS at $RDS_ENDPOINT on port $RDS_PORT."
-    fi
-    print_separator
-}
-
-# Function to check Redis network connectivity
-check_redis_connection() {
-    print_separator
-    echo "$(print_timestamp) - Checking Redis network connectivity..."
-    if nc -zv "$REDIS_ENDPOINT" "$REDIS_PORT" >/dev/null 2>&1; then
-        echo "$(print_timestamp) - Successfully connected to Redis at $REDIS_ENDPOINT on port $REDIS_PORT."
-    else
-        echo "$(print_timestamp) - Failed to connect to Redis at $REDIS_ENDPOINT on port $REDIS_PORT."
-    fi
-    print_separator
 }
 
 # Function to check specific S3 bucket permissions
@@ -73,24 +42,20 @@ check_s3_permissions() {
 }
 
 list_key_value() {
-
-    print_separator
-    
-    port_custom=$1
     declare -A seen_values  # Associative array to store already processed values
 
     for url in $(printenv); do
         # Check for key-value pairs from environment variables
         if [[ $url =~ ^([^=]+)=(.*) ]]; then
-            key=${BASH_REMATCH[1]}  
-            value=${BASH_REMATCH[2]} 
+            key=${BASH_REMATCH[1]}
+            value=${BASH_REMATCH[2]}
         else
             continue
         fi
 
         # Case: URL contains amazonaws.com
         if [[ $value =~ amazonaws\.com ]] && [[ ! $value =~ [^/]+/amazonaws\.com ]] && [[ ! $value =~ amazonaws\.com/[^/]+ ]]; then
-            
+
             # If the value contains @, only take the part after @
             if [[ $value =~ @ ]]; then
                 # Ensure the string after @ contains amazonaws.com
@@ -128,25 +93,45 @@ list_key_value() {
         # Handle URLs that do not contain amazonaws.com
         if [[ $value =~ ^https?://([^:/]+)(:([0-9]+))?(/.*)?$ ]]; then
             host=${BASH_REMATCH[1]}
-            if [[ ${value} =~ ^https:// ]]; then
-                port=${BASH_REMATCH[3]:-443}  
-            elif [[ ${value} =~ ^http:// ]]; then
-                port=${BASH_REMATCH[3]:-80}   
-            fi 
-            echo "${host}:${port}"
+            port=${BASH_REMATCH[3]}
+            if [[ -z $port ]]; then
+                if [[ ${value} =~ ^https:// ]]; then
+                    port=443
+                elif [[ ${value} =~ ^http:// ]]; then
+                    port=80
+                fi
+            fi
 
-        elif [[ $value =~ ^([a-zA-Z0-9.-]+):([0-9]+)$ ]]; then
-            host=${BASH_REMATCH[1]}
-            port=${BASH_REMATCH[2]:-${port_custom:-0}}
+            # Skip if the value has already been processed
+            if [[ -n "${seen_values[${host}:${port}]}" ]]; then
+                continue
+            fi
+
+            # Mark as processed and output the value
+            seen_values[${host}:${port}]=1
             echo "${host}:${port}"
         fi
     done
+}
+
+check_endpoints() {
+    print_separator
+    echo "$(print_timestamp) - Checking endpoints..."
+
+    while IFS= read -r endpoint; do
+        echo "$(print_timestamp) - Checking $endpoint..."
+        host=$(echo "$endpoint" | cut -d':' -f1)
+        port=$(echo "$endpoint" | cut -d':' -f2)
+        if nc -zv "$host" "$port" >/dev/null 2>&1; then
+            echo "$(print_timestamp) - Successfully connected to $endpoint."
+        else
+            echo "$(print_timestamp) - Failed to connect to $endpoint."
+        fi
+    done < <(list_key_value)
 
     print_separator
 }
 
 # Run the checks
-list_key_value
+check_endpoints
 check_s3_permissions
-check_rds_connection
-check_redis_connection
