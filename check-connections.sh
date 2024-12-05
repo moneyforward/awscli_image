@@ -141,12 +141,16 @@ check_endpoints() {
             result="Fail"
         fi
 
-        # Limit the host length to fit the table
-        if [[ ${#endpoint} -gt 35 ]]; then
-            endpoint="${endpoint:0:35}..."
+        # Split the endpoint into multiple lines if it's too long
+        if [[ ${#endpoint} -gt 40 ]]; then
+            split_endpoint=$(echo "$endpoint" | fold -s -w 40)
+            printf "%-5s %-50s %-10s\n" "$count" "$(echo "$split_endpoint" | head -n 1)" "$result"
+            echo "$split_endpoint" | tail -n +2 | while read -r line; do
+                printf "%-5s %-50s %-10s\n" "" "$line" ""
+            done
+        else
+            printf "%-5s %-50s %-10s\n" "$count" "$endpoint" "$result"
         fi
-
-        printf "%-5s %-50s %-10s\n" "$count" "$endpoint" "$result"
         count=$((count + 1))
     done < <(get_envs_key_value)
 
