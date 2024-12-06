@@ -26,7 +26,7 @@ check_s3_permissions() {
     else
         list_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
-    printf "%-30s %-10s\n" "List objects" "$list_result"
+    printf "%-20s %-10s\n" "List objects" "$list_result"
 
     # Check if the user has permission to put objects
     if echo "test" | aws s3 cp - "s3://$bucket_name/test-file" >/dev/null 2>&1; then
@@ -36,7 +36,7 @@ check_s3_permissions() {
     else
         put_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
-    printf "%-30s %-10s\n" "Put objects" "$put_result"
+    printf "%-20s %-10s\n" "Put objects" "$put_result"
 
     # Check if the user has permission to delete objects
     if aws s3 rm "s3://$bucket_name/non-existent-file" >/dev/null 2>&1; then
@@ -44,7 +44,7 @@ check_s3_permissions() {
     else
         delete_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
-    printf "%-30s %-10s\n" "Delete objects" "$delete_result"
+    printf "%-20s %-10s\n" "Delete objects" "$delete_result"
 
     print_separator
 }
