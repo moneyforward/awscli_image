@@ -12,36 +12,44 @@ print_timestamp() {
 
 # Function to check specific S3 bucket permissions
 check_s3_permissions() {
+    local bucket_name=$1
     print_separator
-    echo "$(print_timestamp) - Checking specific permissions for bucket: $AWS_S3_BUCKET"
+    echo "$(print_timestamp) - Checking permissions for bucket: $bucket_name"
+
+    # Print table header
+    printf "%-20s %-10s\n" "Permission" "Result"
+    printf "%-20s %-10s\n" "--------------------" "------"
 
     # Check if the user has permission to list objects
-    if aws s3 ls "s3://$AWS_S3_BUCKET" >/dev/null 2>&1; then
-        echo "List objects permission: Yes"
+    if aws s3 ls "s3://$bucket_name" >/dev/null 2>&1; then
+        list_result=$(tput setaf 2)"Yes"$(tput sgr0)  # Green color for Yes
     else
-        echo "List objects permission: No"
+        list_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
+    printf "%-30s %-10s\n" "List objects" "$list_result"
 
     # Check if the user has permission to put objects
-    if echo "test" | aws s3 cp - "s3://$AWS_S3_BUCKET/test-file" >/dev/null 2>&1; then
-        echo "Put objects permission: Yes"
+    if echo "test" | aws s3 cp - "s3://$bucket_name/test-file" >/dev/null 2>&1; then
+        put_result=$(tput setaf 2)"Yes"$(tput sgr0)  # Green color for Yes
         # Clean up the test file
-        aws s3 rm "s3://$AWS_S3_BUCKET/test-file" >/dev/null 2>&1
+        aws s3 rm "s3://$bucket_name/test-file" >/dev/null 2>&1
     else
-        echo "Put objects permission: No"
+        put_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
+    printf "%-30s %-10s\n" "Put objects" "$put_result"
 
     # Check if the user has permission to delete objects
-    if aws s3 rm "s3://$AWS_S3_BUCKET/non-existent-file" >/dev/null 2>&1; then
-        echo "Delete objects permission: Yes"
+    if aws s3 rm "s3://$bucket_name/non-existent-file" >/dev/null 2>&1; then
+        delete_result=$(tput setaf 2)"Yes"$(tput sgr0)  # Green color for Yes
     else
-        echo "Delete objects permission: No"
+        delete_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
+    printf "%-30s %-10s\n" "Delete objects" "$delete_result"
 
     print_separator
 }
 
-list_key_value() {
+get_envs_key_value() {
     declare -A seen_values  # Associative array to store already processed values
 
     for url in $(printenv); do
@@ -116,22 +124,39 @@ list_key_value() {
 
 check_endpoints() {
     print_separator
-    echo "$(print_timestamp) - Checking endpoints..."
+    echo "$(print_timestamp) - Checking the connectivity of endpoints..."
 
+    # Print table header
+    printf "%-5s %-50s %-10s\n" "No" "Endpoint" "Result"
+    printf "%-5s %-50s %-10s\n" "---" "----------------------------------------" "------"
+
+    count=1
     while IFS= read -r endpoint; do
-        echo "$(print_timestamp) - Checking $endpoint..."
         host=$(echo "$endpoint" | cut -d':' -f1)
         port=$(echo "$endpoint" | cut -d':' -f2)
+
         if nc -zv "$host" "$port" >/dev/null 2>&1; then
-            echo "$(print_timestamp) - Successfully connected to $endpoint."
+            result=$(tput setaf 2)"Pass"$(tput sgr0)  # Green color for Pass
         else
-            echo "$(print_timestamp) - Failed to connect to $endpoint."
+            result=$(tput setaf 1)"Fail"$(tput sgr0)  # Red color for Fail
         fi
-    done < <(list_key_value)
+
+        # Split the endpoint into multiple lines if it's too long
+        if [[ ${#endpoint} -gt 40 ]]; then
+            split_endpoint=$(echo "$endpoint" | fold -s -w 40)
+            printf "%-5s %-50s %-10s\n" "$count" "$(echo "$split_endpoint" | head -n 1)" "$result"
+            echo "$split_endpoint" | tail -n +2 | while read -r line; do
+                printf "%-5s %-50s %-10s\n" "" "$line" ""
+            done
+        else
+            printf "%-5s %-50s %-10s\n" "$count" "$endpoint" "$result"
+        fi
+        count=$((count + 1))
+    done < <(get_envs_key_value)
 
     print_separator
 }
 
 # Run the checks
 check_endpoints
-check_s3_permissions
+check_s3_permissions "$AWS_S3_BUCKET"
