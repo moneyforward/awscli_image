@@ -17,32 +17,32 @@ check_s3_permissions() {
     echo "$(print_timestamp) - Checking permissions for bucket: $bucket_name"
 
     # Print table header
-    printf "%-30s %-10s\n" "Permission" "Result"
-    printf "%-30s %-10s\n" "------------------------------" "------"
+    printf "%-20s %-10s\n" "Permission" "Result"
+    printf "%-20s %-10s\n" "--------------------" "------"
 
     # Check if the user has permission to list objects
     if aws s3 ls "s3://$bucket_name" >/dev/null 2>&1; then
-        list_result="Yes"
+        list_result=$(tput setaf 2)"Yes"$(tput sgr0)  # Green color for Yes
     else
-        list_result="No"
+        list_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
     printf "%-30s %-10s\n" "List objects" "$list_result"
 
     # Check if the user has permission to put objects
     if echo "test" | aws s3 cp - "s3://$bucket_name/test-file" >/dev/null 2>&1; then
-        put_result="Yes"
+        put_result=$(tput setaf 2)"Yes"$(tput sgr0)  # Green color for Yes
         # Clean up the test file
         aws s3 rm "s3://$bucket_name/test-file" >/dev/null 2>&1
     else
-        put_result="No"
+        put_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
     printf "%-30s %-10s\n" "Put objects" "$put_result"
 
     # Check if the user has permission to delete objects
     if aws s3 rm "s3://$bucket_name/non-existent-file" >/dev/null 2>&1; then
-        delete_result="Yes"
+        delete_result=$(tput setaf 2)"Yes"$(tput sgr0)  # Green color for Yes
     else
-        delete_result="No"
+        delete_result=$(tput setaf 1)"No"$(tput sgr0)  # Red color for No
     fi
     printf "%-30s %-10s\n" "Delete objects" "$delete_result"
 
@@ -136,9 +136,9 @@ check_endpoints() {
         port=$(echo "$endpoint" | cut -d':' -f2)
 
         if nc -zv "$host" "$port" >/dev/null 2>&1; then
-            result="Pass"
+            result=$(tput setaf 2)"Pass"$(tput sgr0)  # Green color for Pass
         else
-            result="Fail"
+            result=$(tput setaf 1)"Fail"$(tput sgr0)  # Red color for Fail
         fi
 
         # Split the endpoint into multiple lines if it's too long
