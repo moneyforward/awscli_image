@@ -16,6 +16,19 @@ check_s3_permissions() {
     print_separator
     echo "$(print_timestamp) - Checking permissions for bucket: $bucket_name"
 
+    # Print caller identity
+    echo "$(print_timestamp) - Using the following identity:"
+    caller_identity=$(AWS_PAGER="" aws sts get-caller-identity --output text)
+    user_id=$(echo $caller_identity | awk '{print $3}')
+    account=$(echo $caller_identity | awk '{print $1}')
+    arn=$(echo $caller_identity | awk '{print $2}')
+
+    echo "----------------------------------------"
+    printf "%-10s : %s\n" "UserID" "$user_id"
+    printf "%-10s : %s\n" "Account" "$account"
+    printf "%-10s : %s\n" "ARN" "$arn"
+    echo "----------------------------------------"
+
     # Print table header
     printf "%-20s %-10s\n" "Permission" "Result"
     printf "%-20s %-10s\n" "--------------------" "------"
