@@ -29,8 +29,7 @@ function vault_get_keys() {
 function ssm_get_path() {
   AWS_REGION="ap-northeast-1" # Tokyo region
   params=$(aws ssm get-parameters-by-path --path /$APP_NAME --region $AWS_REGION --with-decryption | jq -r ".Parameters[] | select(.Name | startswith(\"/$APP_NAME/${PREFIX}\")) | .Name")
-  echo "total:" $(wc -l <<< "$params")
-  echo "$params" | tr ' ' '\n' | cut -d '/' -f 3 | sed 's/^/"/;s/$/"/'
+  echo "total of variables in SSM:" $(wc -l <<< "$params")
 
   SSM_VARS=($(echo $params | tr ' ' '\n' | cut -d '/' -f 3 | sed 's/^/"/;s/$/"/'))
 
@@ -45,9 +44,12 @@ function ssm_get_path() {
         fi
     done
     if [[ "$found" == false ]]; then
-        echo "Missing: $expected_var"
+        echo "Missing variable in Vault: $expected_var"
     fi
   done
+  if [[ "$found" == true ]]; then
+    echo "The variables are the same"
+  fi
 }
 
 ssm_get_path
