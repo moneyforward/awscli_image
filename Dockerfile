@@ -8,7 +8,9 @@ RUN yum update -y && \
 COPY ./check-connections.sh /usr/local/bin/check-connections.sh
 COPY ./check-envs.sh /usr/local/bin/check-envs.sh
 COPY ./ssm-compare.sh /usr/local/bin/ssm-compare.sh
+COPY ./ecs-utils.sh /usr/local/bin/ecs-utils.sh
 
 RUN chmod +x /usr/local/bin/check-connections.sh
 RUN chmod +x /usr/local/bin/check-envs.sh
 RUN chmod +x /usr/local/bin/ssm-compare.sh
+RUN chmod +x /usr/local/bin/ecs-utils.sh
