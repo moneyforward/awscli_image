@@ -68,10 +68,10 @@ INSTANCE_CLASS=$(echo "$REPLICA_INFO" | head -n 1 | awk '{print $2}')
 
 echo "Source cluster has $REPLICA_COUNT replicas with instance class $INSTANCE_CLASS."
 
-# Step 4: Create replicas for the cloned cluster
+# Step 4: Create replicas for the cloned cluster in parallel
 for i in $(seq 1 "$REPLICA_COUNT"); do
     REPLICA_NAME="${TARGET_INSTANCE_NAME}-$i"
-    echo "Creating replica $i: $REPLICA_NAME..."
+    echo "Creating db instance $i: $REPLICA_NAME..."
 
     aws rds create-db-instance \
         --db-instance-identifier "$REPLICA_NAME" \
@@ -79,21 +79,46 @@ for i in $(seq 1 "$REPLICA_COUNT"); do
         --engine aurora-mysql \
         --db-cluster-identifier "$TARGET_CLUSTER_NAME" \
         --region "$TARGET_REGION" \
-        --no-cli-pager 2>&1
+        --no-cli-pager > /dev/null 2>&1 &
+done
 
-    if [ $? -ne 0 ]; then
-        error_exit "Failed to create replica $REPLICA_NAME."
-    fi
+# Wait for all background jobs to finish
+wait
 
-    echo "Waiting for replica $REPLICA_NAME to become available..."
+# Step 5: Wait for all replicas to become available
+for i in $(seq 1 "$REPLICA_COUNT"); do
+    REPLICA_NAME="${TARGET_INSTANCE_NAME}-$i"
+    echo "Waiting for db instance $REPLICA_NAME to become available..."
     aws rds wait db-instance-available --db-instance-identifier "$REPLICA_NAME" --region "$TARGET_REGION"
 
     if [ $? -ne 0 ]; then
-        error_exit "Replica $REPLICA_NAME did not become available in time."
+        error_exit "DB instance $REPLICA_NAME did not become available in time."
     fi
 done
 
-echo "All replicas have been created and are available."
+echo "All DB instances have been created and are available."
+
+# Step 6: Retrieve and print the endpoints for the reader and writer
+echo "Retrieving endpoints for the new Aurora cluster $TARGET_CLUSTER_NAME..."
+
+WRITER_ENDPOINT=$(aws rds describe-db-clusters \
+    --db-cluster-identifier "$TARGET_CLUSTER_NAME" \
+    --region "$TARGET_REGION" \
+    --query "DBClusters[0].Endpoint" \
+    --output text)
+
+READER_ENDPOINT=$(aws rds describe-db-clusters \
+    --db-cluster-identifier "$TARGET_CLUSTER_NAME" \
+    --region "$TARGET_REGION" \
+    --query "DBClusters[0].ReaderEndpoint" \
+    --output text)
+
+if [ -z "$WRITER_ENDPOINT" ] || [ -z "$READER_ENDPOINT" ]; then
+    error_exit "Failed to retrieve the endpoints for the new Aurora cluster."
+fi
+
+echo "Writer Endpoint: $WRITER_ENDPOINT"
+echo "Reader Endpoint: $READER_ENDPOINT"
 
 # Capture end time
 END_TIME=$(date +%s)
