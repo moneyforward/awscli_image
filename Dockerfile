@@ -17,6 +17,7 @@ COPY ./ecs-utils.sh /usr/local/bin/
 COPY ./lambda-utils.sh /usr/local/bin/
 COPY ./check-db.sh /usr/local/bin/
 COPY ./db-cloning.sh /usr/local/bin/
+COPY ./migrate-utils.sh /usr/local/bin/
 
 RUN chmod +x /usr/local/bin/check-connections.sh \
     /usr/local/bin/check-envs.sh \
@@ -24,4 +25,5 @@ RUN chmod +x /usr/local/bin/check-connections.sh \
     /usr/local/bin/ecs-utils.sh \
     /usr/local/bin/lambda-utils.sh \
     /usr/local/bin/check-db.sh \
-    /usr/local/bin/db-cloning.sh
+    /usr/local/bin/db-cloning.sh \
+    /usr/local/bin/migrate-utils.sh
