@@ -68,18 +68,25 @@ compare_databases() {
     TABLES=$(mysql -N -B -u "$USER_NAME" -p"$PASSWORD" -h $SOURCE_HOST_NAME -P 3306 -e "SHOW TABLES IN $DB_NAME;" 2>/dev/null)
 
     for TABLE in $TABLES; do
-        SOURCE_HOST_ROWS=$(mysql -N -B -u "$USER_NAME" -p"$PASSWORD" -h $SOURCE_HOST_NAME -P 3306 -e "SELECT COUNT(*) FROM $DB_NAME.$TABLE;" 2>/dev/null)
-        TARGET_HOST_ROWS=$(mysql -N -B -u "$USER_NAME" -p"$PASSWORD" -h $TARGET_HOST_NAME -P 3306 -e "SELECT COUNT(*) FROM $DB_NAME.$TABLE;" 2>/dev/null)
-        if [ "$SOURCE_HOST_ROWS" -eq "$TARGET_HOST_ROWS" ]; then
-            STATUS=$(tput setaf 2)"Consistent"$(tput sgr0)  # Green color
-        else
-            STATUS=$(tput setaf 1)"Inconsistent"$(tput sgr0)  # Red color
-        fi
-        TABLE_WRAPPED=$(print_wrapped "$TABLE" 30 20 20)
-        while IFS= read -r line; do
-            printf "%-30s | %-20s | %-20s | %-10s\n" "$line" "$SOURCE_HOST_ROWS rows" "$TARGET_HOST_ROWS rows" "$STATUS"
-        done <<< "$TABLE_WRAPPED"
+        (
+            # Run row count queries in parallel
+            SOURCE_HOST_ROWS=$(mysql -N -B -u "$USER_NAME" -p"$PASSWORD" -h $SOURCE_HOST_NAME -P 3306 -e "SELECT COUNT(*) FROM $DB_NAME.$TABLE;" 2>/dev/null)
+            TARGET_HOST_ROWS=$(mysql -N -B -u "$USER_NAME" -p"$PASSWORD" -h $TARGET_HOST_NAME -P 3306 -e "SELECT COUNT(*) FROM $DB_NAME.$TABLE;" 2>/dev/null)
+
+            if [ "$SOURCE_HOST_ROWS" -eq "$TARGET_HOST_ROWS" ]; then
+                STATUS=$(tput setaf 2)"Consistent"$(tput sgr0)  # Green color
+            else
+                STATUS=$(tput setaf 1)"Inconsistent"$(tput sgr0)  # Red color
+            fi
+            TABLE_WRAPPED=$(print_wrapped "$TABLE" 30 20 20)
+            while IFS= read -r line; do
+                printf "%-30s | %-20s | %-20s | %-10s\n" "$line" "$SOURCE_HOST_ROWS rows" "$TARGET_HOST_ROWS rows" "$STATUS"
+            done <<< "$TABLE_WRAPPED"
+        ) &
     done
+
+    # Wait for all background processes to complete
+    wait
 
     # Capture end time
     END_TIME=$(date +%s)
