@@ -24,7 +24,27 @@ function error_exit {
 # Capture start time
 START_TIME=$(date +%s)
 
-# Step 1: Clone the primary Aurora cluster
+# Step 1: Retrieve parameter group and cluster parameter group settings from the source cluster
+echo "Retrieving parameter group and cluster parameter group settings from source cluster $SOURCE_CLUSTER_NAME..."
+PARAMETER_GROUP=$(aws rds describe-db-instances \
+    --region "$TARGET_REGION" \
+    --query "DBInstances[?DBClusterIdentifier=='$SOURCE_CLUSTER_NAME'].[DBParameterGroups[0].DBParameterGroupName]" \
+    --output text | head -n 1)
+
+CLUSTER_PARAMETER_GROUP=$(aws rds describe-db-clusters \
+    --db-cluster-identifier "$SOURCE_CLUSTER_NAME" \
+    --region "$TARGET_REGION" \
+    --query "DBClusters[0].DBClusterParameterGroup" \
+    --output text)
+
+if [ -z "$PARAMETER_GROUP" ] || [ -z "$CLUSTER_PARAMETER_GROUP" ]; then
+    error_exit "Failed to retrieve parameter group or cluster parameter group settings."
+fi
+
+echo "Parameter Group: $PARAMETER_GROUP"
+echo "Cluster Parameter Group: $CLUSTER_PARAMETER_GROUP"
+
+# Step 2: Clone the primary Aurora cluster
 echo "Cloning Aurora cluster from $SOURCE_CLUSTER_NAME to $TARGET_CLUSTER_NAME..."
 CLONE_STATUS=$(aws rds restore-db-cluster-to-point-in-time \
     --source-db-cluster-identifier "$SOURCE_CLUSTER_NAME" \
@@ -34,6 +54,7 @@ CLONE_STATUS=$(aws rds restore-db-cluster-to-point-in-time \
     --use-latest-restorable-time \
     --db-subnet-group-name "$DB_SUBNET_GROUP_NAME" \
     --vpc-security-group-ids "${VPC_SECURITY_GROUP_IDS[@]}" \
+    --db-cluster-parameter-group-name "$CLUSTER_PARAMETER_GROUP" \
     --region "$TARGET_REGION" 2>&1)
 
 if [ $? -ne 0 ]; then
@@ -42,7 +63,7 @@ fi
 
 echo "Aurora cluster cloning initiated successfully."
 
-# Step 2: Wait for the cloned cluster to become available
+# Step 3: Wait for the cloned cluster to become available
 echo "Waiting for the new Aurora cluster to become available..."
 aws rds wait db-cluster-available --db-cluster-identifier "$TARGET_CLUSTER_NAME" --region "$TARGET_REGION"
 
@@ -52,7 +73,7 @@ fi
 
 echo "The new Aurora cluster $TARGET_CLUSTER_NAME is available."
 
-# Step 3: Retrieve the number of replicas and instance class from the source cluster
+# Step 4: Retrieve the number of replicas and instance class from the source cluster
 echo "Retrieving replica count and instance class for source cluster $SOURCE_CLUSTER_NAME..."
 REPLICA_INFO=$(aws rds describe-db-instances \
     --region "$TARGET_REGION" \
@@ -68,7 +89,7 @@ INSTANCE_CLASS=$(echo "$REPLICA_INFO" | head -n 1 | awk '{print $2}')
 
 echo "Source cluster has $REPLICA_COUNT replicas with instance class $INSTANCE_CLASS."
 
-# Step 4: Create replicas for the cloned cluster in parallel
+# Step 5: Create replicas for the cloned cluster in parallel
 for i in $(seq 1 "$REPLICA_COUNT"); do
     REPLICA_NAME="${TARGET_INSTANCE_NAME}-$i"
     echo "Creating db instance $i: $REPLICA_NAME..."
@@ -78,6 +99,7 @@ for i in $(seq 1 "$REPLICA_COUNT"); do
         --db-instance-class "$INSTANCE_CLASS" \
         --engine aurora-mysql \
         --db-cluster-identifier "$TARGET_CLUSTER_NAME" \
+        --db-parameter-group-name "$PARAMETER_GROUP" \
         --region "$TARGET_REGION" \
         --no-cli-pager > /dev/null 2>&1 &
 done
@@ -85,7 +107,7 @@ done
 # Wait for all background jobs to finish
 wait
 
-# Step 5: Wait for all replicas to become available
+# Step 6: Wait for all replicas to become available
 for i in $(seq 1 "$REPLICA_COUNT"); do
     REPLICA_NAME="${TARGET_INSTANCE_NAME}-$i"
     echo "Waiting for db instance $REPLICA_NAME to become available..."
@@ -98,7 +120,7 @@ done
 
 echo "All DB instances have been created and are available."
 
-# Step 6: Retrieve and print the endpoints for the reader and writer
+# Step 7: Retrieve and print the endpoints for the reader and writer
 echo "Retrieving endpoints for the new Aurora cluster $TARGET_CLUSTER_NAME..."
 
 WRITER_ENDPOINT=$(aws rds describe-db-clusters \
